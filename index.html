@@ -5,6 +5,7 @@
     <title>3D Noise Bouncy Balls</title>
     <style>
         body { margin: 0; overflow: hidden; background: #050505; font-family: sans-serif; }
+        
         #startBtn {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
@@ -13,13 +14,34 @@
             border-radius: 50px; cursor: pointer; z-index: 10;
             box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
         }
+
+        /* กล่องข้อความเตือนเสียงดัง */
+        #alertBox {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 35px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff;
+            background: rgba(220, 38, 38, 0.85); /* สีแดงเตือน */
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+            pointer-events: none;
+            opacity: 0; /* ซ่อนไว้เป็นค่าเริ่มต้น */
+            transition: opacity 0.2s ease-in-out;
+            z-index: 20;
+        }
     </style>
+    <!-- CDN Three.js & Cannon-es -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
 </head>
 <body>
 
     <button id="startBtn">เปิดไมค์และเริ่มเล่น 3D</button>
+    <div id="alertBox">⚠️ เสียงดังเกินไปแล้ว!</div>
 
     <script>
         let scene, camera, renderer, world;
@@ -28,9 +50,11 @@
         const numBalls = 40;
 
         const startBtn = document.getElementById('startBtn');
+        const alertBox = document.getElementById('alertBox');
+        let alertTimeout = null;
 
         function init() {
-            // 1. สร้าง Three.js Scene
+            // 1. Scene setup
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050505, 0.02);
 
@@ -42,7 +66,7 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // แสงสว่าง
+            // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
@@ -51,24 +75,27 @@
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            // 2. สร้าง Cannon.js Physics World
+            // 2. Physics World setup
             world = new CANNON.World();
-            world.gravity.set(0, -18, 0); // แรงโน้มถ่วงแนวตั้ง
+            world.gravity.set(0, -18, 0);
 
-            // สร้างวัสดุฟิสิกส์ให้ลูกบอลมีความเด้งสูง (Restitution = 0.8)
             const defaultMaterial = new CANNON.Material('default');
             const defaultContactMaterial = new CANNON.ContactMaterial(
                 defaultMaterial, defaultMaterial, { friction: 0.1, restitution: 0.8 }
             );
             world.addContactMaterial(defaultContactMaterial);
 
-            // สร้างกล่องขอบเขตกันลูกบอลกระเด็นออกนอกจอ (Boundaries)
-            createWall(0, -5, 0, 30, 1, 20);  // พื้น
-            createWall(-12, 10, 0, 1, 30, 20); // กำแพงซ้าย
-            createWall(12, 10, 0, 1, 30, 20);  // กำแพงขวา
-            createWall(0, 10, -5, 30, 30, 1);  // ด้านหลัง
+            // สร้างขอบเขต (Boundaries)
+            createWall(0, -5, 0, 30, 1, 20);   // พื้น
+            createWall(-12, 10, 0, 1, 30, 20);  // กำแพงซ้าย
+            createWall(12, 10, 0, 1, 30, 20);   // กำแพงขวา
+            createWall(0, 10, -5, 30, 30, 1);   // ด้านหลัง
 
-            // สุ่มสร้างลูกบอล 3D
+            // *** เพิ่มเพดาน (Top Wall) และติดระบบตรวจจับการชน ***
+            const topWall = createWall(0, 18, 0, 30, 1, 20);
+            topWall.addEventListener('collide', onTopWallCollide);
+
+            // สร้างลูกบอล 3D
             for (let i = 0; i < numBalls; i++) {
                 createBall(defaultMaterial);
             }
@@ -76,19 +103,34 @@
             window.addEventListener('resize', onWindowResize);
         }
 
+        // ฟังก์ชันสร้างกำแพง (คืนค่า Body เพื่อนำไปใส่ Event)
         function createWall(x, y, z, w, h, d) {
             const body = new CANNON.Body({
-                mass: 0, // Mass = 0 เพื่อให้วัตถุอยู่นิ่งไม่ตกลงมา
+                mass: 0,
                 shape: new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2))
             });
             body.position.set(x, y, z);
             world.addBody(body);
+            return body;
+        }
+
+        // เมื่อลูกบอลชนเพดาน
+        function onTopWallCollide(e) {
+            // แสดงข้อความเตือน
+            alertBox.style.opacity = '1';
+
+            // เคลียร์ Timer เดิมเพื่อรีเซ็ตเวลาใหม่ทุกครั้งที่มีการชนซ้ำ
+            if (alertTimeout) clearTimeout(alertTimeout);
+
+            // ให้ข้อความค่อยๆ ซ่อนหลังจากไม่มีการชน 1 วินาที
+            alertTimeout = setTimeout(() => {
+                alertBox.style.opacity = '0';
+            }, 1000);
         }
 
         function createBall(material) {
             const radius = Math.random() * 0.5 + 0.6;
             
-            // 3D Mesh (Three.js)
             const geometry = new THREE.SphereGeometry(radius, 32, 32);
             const color = new THREE.Color(`hsl(${Math.random() * 360}, 85%, 60%)`);
             const THREE_Material = new THREE.MeshStandardMaterial({ 
@@ -100,7 +142,6 @@
             mesh.castShadow = true;
             scene.add(mesh);
 
-            // Physics Body (Cannon.js)
             const body = new CANNON.Body({
                 mass: 1,
                 shape: new CANNON.Sphere(radius),
@@ -116,7 +157,6 @@
             balls.push({ mesh, body });
         }
 
-        // ระบบรับเสียงจากไมโครโฟน
         async function initAudio() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -143,27 +183,24 @@
             return sum / dataArray.length;
         }
 
-        // Main Loop
         const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
 
             const delta = clock.getDelta();
-            world.step(1 / 60, delta, 3); // อัปเดตโลกฟิสิกส์
+            world.step(1 / 60, delta, 3);
 
             const volume = getVolume();
 
-            // ถ้ามีเสียงดัง ให้ส่งแรง Impulse ผลักลูกบอลขึ้นด้านบน
             balls.forEach(ball => {
                 if (volume > 15) {
-                    const force = (volume / 255) * (Math.random() * 12 + 8);
+                    const force = (volume / 255) * (Math.random() * 14 + 10);
                     ball.body.applyImpulse(
                         new CANNON.Vec3((Math.random() - 0.5) * 2, force, (Math.random() - 0.5) * 2),
                         ball.body.position
                     );
                 }
 
-                // ซิงค์ตำแหน่งและระนาบหมุนจาก Physics สู่ 3D Graphic
                 ball.mesh.position.copy(ball.body.position);
                 ball.mesh.quaternion.copy(ball.body.quaternion);
             });
