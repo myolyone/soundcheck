@@ -15,7 +15,6 @@
             box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
         }
 
-        /* กล่องข้อความเตือนเสียงดัง */
         #alertBox {
             position: absolute;
             top: 10%;
@@ -25,18 +24,18 @@
             font-size: 28px;
             font-weight: bold;
             color: #ffffff;
-            background: rgba(220, 38, 38, 0.85); /* สีแดงเตือน */
+            background: rgba(220, 38, 38, 0.85);
             border-radius: 12px;
             box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
             pointer-events: none;
-            opacity: 0; /* ซ่อนไว้เป็นค่าเริ่มต้น */
+            opacity: 0;
             transition: opacity 0.2s ease-in-out;
             z-index: 20;
         }
     </style>
-    <!-- CDN Three.js & Cannon-es -->
+    <!-- ปรับปรุงลิงก์ CDN ให้เสถียรยิ่งขึ้น -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 </head>
 <body>
 
@@ -54,7 +53,6 @@
         let alertTimeout = null;
 
         function init() {
-            // 1. Scene setup
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050505, 0.02);
 
@@ -66,7 +64,6 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
@@ -75,7 +72,7 @@
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            // 2. Physics World setup
+            // ใช้ CANNON แบบดั้งเดิมเพื่อหลีกเลี่ยงปัญหา CDN ES Module
             world = new CANNON.World();
             world.gravity.set(0, -18, 0);
 
@@ -85,17 +82,14 @@
             );
             world.addContactMaterial(defaultContactMaterial);
 
-            // สร้างขอบเขต (Boundaries)
             createWall(0, -5, 0, 30, 1, 20);   // พื้น
-            createWall(-12, 10, 0, 1, 30, 20);  // กำแพงซ้าย
-            createWall(12, 10, 0, 1, 30, 20);   // กำแพงขวา
-            createWall(0, 10, -5, 30, 30, 1);   // ด้านหลัง
+            createWall(-12, 10, 0, 1, 30, 20);  // ซ้าย
+            createWall(12, 10, 0, 1, 30, 20);   // ขวา
+            createWall(0, 10, -5, 30, 30, 1);   // หลัง
 
-            // *** เพิ่มเพดาน (Top Wall) และติดระบบตรวจจับการชน ***
-            const topWall = createWall(0, 18, 0, 30, 1, 20);
+            const topWall = createWall(0, 18, 0, 30, 1, 20); // เพดาน
             topWall.addEventListener('collide', onTopWallCollide);
 
-            // สร้างลูกบอล 3D
             for (let i = 0; i < numBalls; i++) {
                 createBall(defaultMaterial);
             }
@@ -103,7 +97,6 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        // ฟังก์ชันสร้างกำแพง (คืนค่า Body เพื่อนำไปใส่ Event)
         function createWall(x, y, z, w, h, d) {
             const body = new CANNON.Body({
                 mass: 0,
@@ -114,15 +107,9 @@
             return body;
         }
 
-        // เมื่อลูกบอลชนเพดาน
-        function onTopWallCollide(e) {
-            // แสดงข้อความเตือน
+        function onTopWallCollide() {
             alertBox.style.opacity = '1';
-
-            // เคลียร์ Timer เดิมเพื่อรีเซ็ตเวลาใหม่ทุกครั้งที่มีการชนซ้ำ
             if (alertTimeout) clearTimeout(alertTimeout);
-
-            // ให้ข้อความค่อยๆ ซ่อนหลังจากไม่มีการชน 1 วินาที
             alertTimeout = setTimeout(() => {
                 alertBox.style.opacity = '0';
             }, 1000);
@@ -171,7 +158,7 @@
                 startBtn.style.display = 'none';
                 animate();
             } catch (err) {
-                alert('ไม่สามารถเปิดใช้งานไมโครโฟนได้: ' + err);
+                alert('เปิดไมค์ไม่ได้! หากเปิดไฟล์ตรงๆ ให้รันผ่าน Live Server แทนครับ: ' + err);
             }
         }
 
