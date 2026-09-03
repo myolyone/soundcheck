@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Noise Bouncy Balls</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; }
+        canvas { display: block; }
+        #startBtn {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px; font-size: 18px;
+            background: #4CAF50; color: white; border: none;
+            border-radius: 8px; cursor: pointer; z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="startBtn">เริ่มเปิดไมค์และเล่น</button>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+
+        let audioContext, analyser, microphone, dataArray;
+        let balls = [];
+        const numBalls = 30;
+
+        // ปรับขนาด Canvas ให้เต็มจอ
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // คลาสสร้างและจัดการลูกบอล
+        class Ball {
+            constructor() {
+                this.radius = Math.random() * 20 + 15;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = canvas.height - this.radius - Math.random() * 100;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = 0;
+                this.gravity = 0.4;
+                this.bounce = 0.7; // แรงเด้งคืนกลับ
+                this.color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+            }
+
+            update(volume) {
+                // ถ้ามีเสียงดัง ให้เพิ่มแรงส่งขึ้นด้านบน
+                if (volume > 15) { 
+                    this.vy -= (volume / 100) * (Math.random() * 2 + 1);
+                }
+
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // ชนพื้น
+                if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.vy *= -this.bounce;
+                }
+                // ชนเพดาน
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -this.bounce;
+                }
+                // ชนขอบซ้าย-ขวา
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.vx *= -1;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        // เริ่มการทำงานของ ไมโครโฟน
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                analyser.fftSize = 256;
+                microphone.connect(analyser);
+                
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                // สุ่มสร้างลูกบอล
+                for (let i = 0; i < numBalls; i++) {
+                    balls.push(new Ball());
+                }
+
+                startBtn.style.display = 'none';
+                animate();
+            } catch (err) {
+                alert('ไม่สามารถเข้าถึงไมโครโฟนได้: ' + err);
+            }
+        }
+
+        // คำนวณความดังระดับเสียงเฉลี่ย
+        function getVolume() {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            return sum / dataArray.length; // คืนค่าเฉลี่ย 0 - 255
+        }
+
+        // Loop แสดงผล Animation
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const volume = getVolume();
+
+            balls.forEach(ball => {
+                ball.update(volume);
+                ball.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        startBtn.addEventListener('click', initAudio);
+    </script>
+</body>
+</html>
